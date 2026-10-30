@@ -1,0 +1,390 @@
+{
+  "name": "teste torn",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "tort-experts-intake",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "b91bb199-27b6-40ec-93ae-bbdca33975c9",
+      "name": "Webhook",
+      "webhookId": "cf8a93ce-75eb-4d50-911d-0b81287261b6"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "466d8131-868f-4908-8cfe-4eff67efedb3",
+              "name": "nome",
+              "value": "={{ $json.body?.nome || $json.nome || \"Nao informado\" }}",
+              "type": "string"
+            },
+            {
+              "id": "27d69925-b12f-46bb-9eea-23bf5b5f13e7",
+              "name": "telefone",
+              "value": "={{ $json.body?.telefone || $json.telefone || \"Nao informado\" }}",
+              "type": "string"
+            },
+            {
+              "id": "4f5656f2-e061-4799-9ba5-f4e466bc392f",
+              "name": "email",
+              "value": "={{ $json.body?.email || $json.email || \"Nao informado\" }}",
+              "type": "string"
+            },
+            {
+              "id": "d9fe7e90-1e85-40ed-b963-bc70131d3a76",
+              "name": "relato",
+              "value": "={{ $json.body?.relato || $json.relato || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "1e6c6955-6453-4278-a619-d9fe0c41ce49",
+              "name": "origem",
+              "value": "={{ $json.body?.origem || $json.origem || \"webhook\" }}",
+              "type": "string"
+            },
+            {
+              "id": "49540010-b5f8-445e-beca-32d14951101a",
+              "name": "received_at",
+              "value": "={{ $now }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        0
+      ],
+      "id": "931a070e-ef04-4307-8def-f76f387841de",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c54fb12d-bb7b-4b16-8c36-80610bde6f70",
+              "leftValue": "={{$json.ai.is_valid}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        784,
+        0
+      ],
+      "id": "72f1555f-258a-436c-98e7-90e4bd6da9e0",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama3.1:8b\",\n  \"prompt\": \"Voce eh um classificador juridico. Responda APENAS JSON valido neste formato: {\\\"is_valid\\\":true,\\\"case_type\\\":\\\"...\\\",\\\"reason\\\":\\\"...\\\",\\\"confidence\\\":0.0,\\\"urgency\\\":\\\"alta|media|baixa\\\"}. Classifique o relato:\\n\\n{{$json.relato}}\",\n  \"stream\": false\n}\n\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        416,
+        0
+      ],
+      "id": "7a954e0c-3c45-4b19-97c6-3f0aea5e24dc",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $input.first().json;\nconst raw = j.response || '';\n\nlet parsed;\ntry {\n  parsed = JSON.parse(raw);\n} catch {\n  parsed = {\n    is_valid: false,\n    case_type: 'indefinido',\n    reason: 'Falha ao interpretar JSON da IA',\n    confidence: 0,\n    urgency: 'media'\n  };\n}\n\nreturn [{\n  json: {\n    ...j,\n    ai: {\n      is_valid: !!parsed.is_valid,\n      case_type: parsed.case_type || 'indefinido',\n      reason: parsed.reason || 'Sem justificativa',\n      confidence: Number(parsed.confidence ?? 0),\n      urgency: parsed.urgency || 'media'\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        0
+      ],
+      "id": "22708bf7-e7fa-4cd8-a8f1-ed4c4cd35f7d",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst content = JSON.stringify(item.json, null, 2);\n\nitem.binary = {\n  data: {\n    data: Buffer.from(content, 'utf8').toString('base64'),\n    mimeType: 'application/json',\n    fileName: `valid_${Date.now()}.json`,\n  },\n};\n\nreturn [item];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        -96
+      ],
+      "id": "63d7124a-b945-4ada-9a9d-1634a4834e8e",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "=C:/Users/hakoy/.n8n-files/casos_validos/{{$binary.data.fileName}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        -96
+      ],
+      "id": "ca5f98df-0798-4799-be66-999f72546fd3",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst content = JSON.stringify(item.json, null, 2);\n\nitem.binary = {\n  data: {\n    data: Buffer.from(content, 'utf8').toString('base64'),\n    mimeType: 'application/json',\n    fileName: `invalid_${Date.now()}.json`,\n  },\n};\n\nreturn [item];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        96
+      ],
+      "id": "f1a1bfca-686b-404b-969e-6a3e27f2c4a0",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "=C:/Users/hakoy/.n8n-files/alertas_invalidos/{{$binary.data.fileName}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        96
+      ],
+      "id": "261de3f1-a89d-4233-816f-8f71b96e8a82",
+      "name": "Read/Write Files from Disk1"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1408,
+        96
+      ],
+      "id": "293c4ff8-37c9-4302-8de4-800059424380",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        416,
+        -256
+      ],
+      "id": "cab190b2-07c0-4729-93bc-d6c0637e8abb",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "fileSelector": "C:/Users/hakoy/.n8n-files/casos_validos/*.json",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        624,
+        -256
+      ],
+      "id": "f1903717-7700-4f6a-90b3-a53fb9719249",
+      "name": "Read/Write Files from Disk2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const out = [];\n\nfor (const item of $input.all()) {\n  const b64 = item.binary.data.data;\n  let text = Buffer.from(b64, 'base64').toString('utf8');\n\n  // Remove BOM e espaços estranhos\n  text = text.replace(/^\\uFEFF/, '').trim();\n\n  try {\n    out.push({ json: JSON.parse(text) });\n  } catch (e) {\n    // Não quebra o fluxo: devolve info do arquivo com erro\n    out.push({\n      json: {\n        parse_error: true,\n        fileName: item.binary?.data?.fileName || 'unknown',\n        message: e.message,\n        raw_preview: text.slice(0, 500)\n      }\n    });\n  }\n}\n\nreturn out;\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        832,
+        -256
+      ],
+      "id": "b7d6cc59-2011-448c-9a7c-489c626f2842",
+      "name": "Code in JavaScript3"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "db901dda-1d6d-473c-b028-c3ddc66cc355",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "cf353e3f69710e822b22c1b3c4b9b11ac1f2e33ed7d50b027f98a4b2cd00d56e"
+  },
+  "id": "pRMVU3Z159nn2cB4",
+  "tags": []
+}
